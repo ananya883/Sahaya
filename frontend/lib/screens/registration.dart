@@ -35,8 +35,6 @@ class _RegisterPageState extends State<RegisterPage> {
   // User details
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _passwordController = TextEditingController();
-  final TextEditingController _confirmPasswordController = TextEditingController();
   final TextEditingController _dobController = TextEditingController();
   final TextEditingController _mobileController = TextEditingController();
   final TextEditingController _addressController = TextEditingController();
@@ -49,16 +47,16 @@ class _RegisterPageState extends State<RegisterPage> {
   final TextEditingController _guardianEmailController = TextEditingController();
   final TextEditingController _guardianAddressController = TextEditingController();
 
+  // OTP
+  final TextEditingController _otpController = TextEditingController();
+  bool _otpSent = false;
+
   bool _loading = false;
-  bool _obscurePassword = true;
-  bool _obscureConfirmPassword = true;
 
   @override
   void dispose() {
     _nameController.dispose();
     _emailController.dispose();
-    _passwordController.dispose();
-    _confirmPasswordController.dispose();
     _dobController.dispose();
     _mobileController.dispose();
     _addressController.dispose();
@@ -68,6 +66,7 @@ class _RegisterPageState extends State<RegisterPage> {
     _guardianMobileController.dispose();
     _guardianEmailController.dispose();
     _guardianAddressController.dispose();
+    _otpController.dispose();
     super.dispose();
   }
 
@@ -94,6 +93,60 @@ class _RegisterPageState extends State<RegisterPage> {
     }
   }
 
+  // ---------------- Send OTP ----------------
+  void _sendOtp() async {
+    if (_emailController.text.isEmpty) {
+      _showError("Enter email to send OTP");
+      return;
+    }
+
+    setState(() => _loading = true);
+
+    try {
+      final response = await ApiService.sendOtp(_emailController.text.trim());
+      if (response.statusCode == 200) {
+        setState(() => _otpSent = true);
+        _showSnackBar("OTP sent to your email!", Colors.green);
+      } else {
+        final responseBody = jsonDecode(response.body);
+        _showError(responseBody['error'] ?? "Failed to send OTP");
+      }
+    } catch (e) {
+      _showError("Error sending OTP. Check connection.");
+    } finally {
+      setState(() => _loading = false);
+    }
+  }
+
+  // ---------------- Verify OTP ----------------
+  void _verifyOtp() async {
+    if (_otpController.text.isEmpty) {
+      _showError("Enter OTP");
+      return;
+    }
+
+    setState(() => _loading = true);
+
+    try {
+      final response = await ApiService.verifyOtp(
+        _emailController.text.trim(),
+        _otpController.text.trim(),
+      );
+
+      if (response.statusCode == 200) {
+        _showSnackBar("Email verified! Now register.", Colors.green);
+      } else {
+        final responseBody = jsonDecode(response.body);
+        _showError(responseBody['error'] ?? "OTP verification failed");
+      }
+    } catch (e) {
+      _showError("Error verifying OTP. Check connection.");
+    } finally {
+      setState(() => _loading = false);
+    }
+  }
+
+  // ---------------- Register ----------------
   void _register() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -102,11 +155,10 @@ class _RegisterPageState extends State<RegisterPage> {
     try {
       final response = await ApiService.registerUser(
         Name: _nameController.text.trim(),
-        gender: "Other", // can add a dropdown later
+        gender: "Other",
         dob: _dobController.text.trim(),
         mobile: _mobileController.text.trim(),
         email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
         address: _addressController.text.trim(),
         houseNo: _houseNoController.text.trim(),
         guardianName: _guardianNameController.text.trim(),
@@ -116,10 +168,8 @@ class _RegisterPageState extends State<RegisterPage> {
         guardianAddress: _guardianAddressController.text.trim(),
       );
 
-      if (!mounted) return;
-
       if (response.statusCode == 200 || response.statusCode == 201) {
-        _showSnackBar("Registered successfully! Proceeding to login.", Colors.green);
+        _showSnackBar("Registered successfully! Check your email for password.", Colors.green);
         Navigator.pushReplacementNamed(context, '/login');
       } else {
         final responseBody = jsonDecode(response.body);
@@ -128,7 +178,7 @@ class _RegisterPageState extends State<RegisterPage> {
     } catch (e) {
       _showError("An error occurred. Please check your connection.");
     } finally {
-      if (mounted) setState(() => _loading = false);
+      setState(() => _loading = false);
     }
   }
 
@@ -193,48 +243,42 @@ class _RegisterPageState extends State<RegisterPage> {
                     decoration: _buildInputDecoration(hint: "Email", icon: Icons.mail_outline),
                   ),
                   const SizedBox(height: 16),
-                  TextFormField(
-                    controller: _passwordController,
-                    obscureText: _obscurePassword,
-                    validator: (v) => v!.isEmpty ? 'Enter password' : null,
-                    decoration: _buildInputDecoration(hint: "Password", icon: Icons.lock_outline).copyWith(
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _obscurePassword ? Icons.visibility_off : Icons.visibility,
-                          color: _primaryColor,
+
+                  // ---------------- OTP SECTION ----------------
+                  if (_otpSent)
+                    Column(
+                      children: [
+                        TextFormField(
+                          controller: _otpController,
+                          keyboardType: TextInputType.number,
+                          validator: (v) => v!.isEmpty ? 'Enter OTP' : null,
+                          decoration: _buildInputDecoration(hint: "Enter OTP", icon: Icons.confirmation_num),
                         ),
-                        onPressed: () {
-                          setState(() {
-                            _obscurePassword = !_obscurePassword;
-                          });
-                        },
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    controller: _confirmPasswordController,
-                    obscureText: _obscureConfirmPassword,
-                    validator: (v) {
-                      if (v!.isEmpty) return 'Confirm password';
-                      if (v != _passwordController.text) return 'Passwords do not match';
-                      return null;
-                    },
-                    decoration: _buildInputDecoration(hint: "Confirm Password", icon: Icons.lock_outline).copyWith(
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _obscureConfirmPassword ? Icons.visibility_off : Icons.visibility,
-                          color: _primaryColor,
+                        const SizedBox(height: 12),
+                        ElevatedButton(
+                          onPressed: _verifyOtp,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: _primaryColor,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          child: const Text("Verify OTP", style: TextStyle(fontSize: 16, color: Colors.white)),
                         ),
-                        onPressed: () {
-                          setState(() {
-                            _obscureConfirmPassword = !_obscureConfirmPassword;
-                          });
-                        },
+                      ],
+                    )
+                  else
+                    ElevatedButton(
+                      onPressed: _sendOtp,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _primaryColor,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                       ),
+                      child: const Text("Send OTP", style: TextStyle(fontSize: 16, color: Colors.white)),
                     ),
-                  ),
                   const SizedBox(height: 16),
+
+                  // Date of Birth
                   TextFormField(
                     controller: _dobController,
                     readOnly: true,
@@ -297,8 +341,8 @@ class _RegisterPageState extends State<RegisterPage> {
                     validator: (v) => v!.isEmpty ? 'Enter address' : null,
                     decoration: _buildInputDecoration(hint: "Guardian Address", icon: Icons.home),
                   ),
-
                   const SizedBox(height: 30),
+
                   _loading
                       ? const Center(child: CircularProgressIndicator(color: _primaryColor))
                       : ElevatedButton(

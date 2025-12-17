@@ -1,21 +1,45 @@
 name: sahaya_app
 description: A basic Flutter app for Sahaya project
-publish_to: 'none'
+publish_to: 'none' # private app
 
 environment:
-  # This line has been corrected from '3.eno' to '3.8.0'
   sdk: ">=3.8.0 <4.0.0"
 
 dependencies:
   flutter:
     sdk: flutter
+
+  # Networking
   http: ^1.1.0
+
+  # Storage
   shared_preferences: ^2.1.0
+
+  # Date formatting
   intl: ^0.19.0
+
+  # Maps
+  flutter_map: ^6.1.0
+  latlong2: ^0.9.0
+
+  # Location
+  geolocator: ^12.0.0
+  permission_handler: ^11.3.0
+
+  # Image capture & file handling
+  image_picker: ^0.8.7+6
+  path: ^1.8.2
+
+  # Camera integration
+  camera: ^0.11.0+2
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  flutter_lints: ^2.0.0
 
 flutter:
-  uses-material-design: true  # this enables Material Icons and widgets
+  uses-material-design: true
+
+  assets:
+    - assets/images/

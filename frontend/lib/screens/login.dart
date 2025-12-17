@@ -1,18 +1,17 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import 'homepage.dart';
 
-// Define the primary color used in the design (a modern blue)
 const Color _primaryColor = Color(0xFF1E88E5);
-const double _headerHeight = 220.0; // Height of the blue header
+const double _headerHeight = 220.0;
 
-// Custom clipper to create the curved shape at the bottom of the header
 class CustomHeaderClipper extends CustomClipper<Path> {
   @override
   Path getClip(Size size) {
     Path path = Path();
     path.lineTo(0, size.height - 50);
-    path.quadraticBezierTo(
-        size.width / 2, size.height, size.width, size.height - 50);
+    path.quadraticBezierTo(size.width / 2, size.height, size.width, size.height - 50);
     path.lineTo(size.width, 0);
     path.close();
     return path;
@@ -34,46 +33,51 @@ class _LoginPageState extends State<LoginPage> {
   final TextEditingController _passwordController = TextEditingController();
   bool _loading = false;
 
-  void _login() async {
+  // ----------------- LOGIN FUNCTION -----------------
+  Future<void> _login() async {
     setState(() => _loading = true);
-    // Simulate API call for demonstration
-    await Future.delayed(const Duration(milliseconds: 800));
-    final response = await ApiService.loginUser(
-      _emailController.text.trim(),
-      _passwordController.text.trim(),
-    );
-    setState(() => _loading = false);
 
-    if (response.statusCode == 200) {
-      // Navigate on success
-      Navigator.pushReplacementNamed(context, '/home');
-    } else {
-      // Show error snackbar
+    try {
+      final response = await ApiService.loginUser(
+        _emailController.text.trim(),
+        _passwordController.text.trim(),
+      );
+
+      setState(() => _loading = false);
+
+      if (response.statusCode == 200) {
+        // Optionally parse user info if backend returns it
+        final data = jsonDecode(response.body);
+        String userName = data['user']?['Name'] ?? '';
+
+        // Navigate to HomePage
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => HomePage()), // Pass userName if needed
+        );
+      } else {
+        final data = jsonDecode(response.body);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(data['error'] ?? "Invalid credentials")),
+        );
+      }
+    } catch (e) {
+      setState(() => _loading = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Invalid credentials. Please try again.")),
+        const SnackBar(content: Text("Error connecting to server")),
       );
     }
   }
 
-  // Widget to build the curved blue header and lock icon
-  Widget _buildHeader(BuildContext context) {
+  // ----------------- HEADER -----------------
+  Widget _buildHeader() {
     return ClipPath(
       clipper: CustomHeaderClipper(),
       child: Container(
         height: _headerHeight,
         color: _primaryColor,
         alignment: Alignment.center,
-        child: const Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            SizedBox(height: 30), // Offset from the very top edge
-            Icon(
-              Icons.lock_rounded,
-              color: Colors.white,
-              size: 64,
-            ),
-          ],
-        ),
+        child: const Icon(Icons.lock_rounded, color: Colors.white, size: 64),
       ),
     );
   }
@@ -84,33 +88,23 @@ class _LoginPageState extends State<LoginPage> {
       backgroundColor: Colors.white,
       body: Stack(
         children: [
-          // 1. Blue Curved Header
-          _buildHeader(context),
-
-          // 2. Login Form Content
+          _buildHeader(),
           SingleChildScrollView(
-            // Adjust top padding to start content below the curve
             padding: const EdgeInsets.only(top: _headerHeight - 40, left: 24, right: 24),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                const SizedBox(height: 20),
                 const Text(
                   "Welcome Back",
-                  style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black87,
-                  ),
                   textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.black87),
                 ),
                 const SizedBox(height: 8),
                 const Text(
                   "Sign in to continue",
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.grey,
-                  ),
                   textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 16, color: Colors.grey),
                 ),
                 const SizedBox(height: 40),
 
@@ -121,22 +115,10 @@ class _LoginPageState extends State<LoginPage> {
                   decoration: InputDecoration(
                     hintText: "Email",
                     prefixIcon: const Icon(Icons.mail_outline, color: _primaryColor),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: BorderSide.none, // Remove visible border
-                    ),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
                     filled: true,
                     fillColor: Colors.white,
                     contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
-                    // Adding a subtle shadow/elevation look using a decoration property
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: const BorderSide(color: Colors.grey, width: 0.1),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: const BorderSide(color: _primaryColor, width: 2),
-                    ),
                   ),
                 ),
                 const SizedBox(height: 20),
@@ -148,21 +130,10 @@ class _LoginPageState extends State<LoginPage> {
                   decoration: InputDecoration(
                     hintText: "Password",
                     prefixIcon: const Icon(Icons.lock_outline, color: _primaryColor),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: BorderSide.none,
-                    ),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
                     filled: true,
                     fillColor: Colors.white,
                     contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: const BorderSide(color: Colors.grey, width: 0.1),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: const BorderSide(color: _primaryColor, width: 2),
-                    ),
                   ),
                 ),
                 const SizedBox(height: 30),
@@ -175,35 +146,20 @@ class _LoginPageState extends State<LoginPage> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: _primaryColor,
                     padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    elevation: 4, // Add shadow
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),
-                  child: const Text(
-                    "Login",
-                    style: TextStyle(fontSize: 18, color: Colors.white),
-                  ),
+                  child: const Text("Login", style: TextStyle(fontSize: 18, color: Colors.white)),
                 ),
                 const SizedBox(height: 30),
 
-                // "Create Account" Link
+                // Links
                 TextButton(
                   onPressed: () => Navigator.pushNamed(context, '/register'),
-                  child: const Text(
-                    "Create Account",
-                    style: TextStyle(color: _primaryColor, fontSize: 16),
-                  ),
+                  child: const Text("Create Account", style: TextStyle(color: _primaryColor, fontSize: 16)),
                 ),
-                const SizedBox(height: 10),
-
-                // "Forgot Password?" Link
                 TextButton(
                   onPressed: () => Navigator.pushNamed(context, '/forgot'),
-                  child: const Text(
-                    "Forgot Password?",
-                    style: TextStyle(color: Colors.grey, fontSize: 16),
-                  ),
+                  child: const Text("Forgot Password?", style: TextStyle(color: Colors.grey, fontSize: 16)),
                 ),
               ],
             ),
