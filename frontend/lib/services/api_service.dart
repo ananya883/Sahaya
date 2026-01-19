@@ -7,7 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
 class ApiService {
-  static const String baseUrl = "http://192.168.143.38:5000";
+  static const String baseUrl = "http://10.49.2.38:5001";
 
   static Future<http.Response> loginUser(String email, String password) async {
     final url = Uri.parse('$baseUrl/api/auth/login');
@@ -17,8 +17,6 @@ class ApiService {
       body: jsonEncode({'email': email, 'password': password}),
     );
   }
-
-  // ----------------- Send OTP -----------------
   static Future<http.Response> sendOtp(String email) async {
     final url = Uri.parse('$baseUrl/api/auth/send-verification-otp');
     return await http.post(
@@ -28,7 +26,7 @@ class ApiService {
     );
   }
 
-  // ----------------- Verify OTP -----------------
+
   static Future<http.Response> verifyOtp(String email, String otp) async {
     final url = Uri.parse('$baseUrl/api/auth/verify-email-otp');
     return await http.post(

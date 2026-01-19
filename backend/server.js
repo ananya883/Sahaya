@@ -6,37 +6,53 @@ import path from "path";
 import { fileURLToPath } from "url";
 
 import authRoutes from "./routes/authRoutes.js";
-import sosRoutes from "./routes/sosRoutes.js";  // ✅ new import
+import sosRoutes from "./routes/sosRoutes.js";
+import missingPersonRoutes from "./routes/missingPersonRoutes.js";
+import matchRoutes from "./routes/match.routes.js";              // ✅ ADD
+import notificationRoutes from "./routes/notification.routes.js"; // ✅ ADD
+import unknownRoutes from "./routes/unknown.routes.js";
 
 dotenv.config();
 
 const app = express();
 
-// Middleware
+// ---------- Middleware ----------
 app.use(cors());
 app.use(express.json());
 
-// ---------- For uploaded SOS images ----------
+app.use("/api/unknown", unknownRoutes);
+
+
+// ---------- File path setup ----------
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-app.use("/uploads", express.static(path.join(__dirname, "uploads"))); // ✅ serve uploaded images
 
-// Test route
+// ---------- Serve uploaded images ----------
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+
+// ---------- Test route ----------
 app.get("/", (req, res) => {
   res.send("Server is running!");
 });
 
-// Routes
+// ---------- Routes ----------
 app.use("/api/auth", authRoutes);
-app.use("/api/sos", sosRoutes);  // ✅ new route added
+app.use("/api/sos", sosRoutes);
 
-// Connect to MongoDB and start server
-const PORT = process.env.PORT || 5000;
+// Missing person (register, list, etc.)
+app.use("/api/missing", missingPersonRoutes);
 
-mongoose.connect(process.env.MONGO_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-})
+// Matching (found person → AI → match)
+app.use("/api/match", matchRoutes);                 // ✅ ADD
+
+// Notifications
+app.use("/api/notifications", notificationRoutes); // ✅ ADD
+
+// ---------- DB & Server ----------
+const PORT = process.env.PORT || 5001;
+
+mongoose
+  .connect(process.env.MONGO_URI)
   .then(() => {
     console.log("✅ MongoDB connected");
     app.listen(PORT, "0.0.0.0", () => {

@@ -30,7 +30,7 @@ class _SahayaTitlePageState extends State<SahayaTitlePage> {
             children: [
               // App Icon
               Image.asset(
-                'assets/images/sahya_logo.png',
+                'assets/images/sahaya_logo.png',
                 height: 150,
                 width: 150,
               ),

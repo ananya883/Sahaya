@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import 'homepage.dart';
@@ -48,7 +49,13 @@ class _LoginPageState extends State<LoginPage> {
       if (response.statusCode == 200) {
         // Optionally parse user info if backend returns it
         final data = jsonDecode(response.body);
-        String userName = data['user']?['Name'] ?? '';
+        String userId = data['user']['_id'];
+        String userName = data['user']['Name'];
+
+        // Save to SharedPreferences
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('userId', userId);
+        await prefs.setString('userName', userName);
 
         // Navigate to HomePage
         Navigator.pushReplacement(

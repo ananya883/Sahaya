@@ -1,10 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 
-// Import the SOS page
-import 'sos_page.dart'; // Make sure this path matches your file structure
+import '../widgets/top_match_notification.dart';
+import '../services/notification_service.dart';
+
+import 'register_missing_person.dart';
+import 'sos_page.dart';
+import 'first_aid_voice_page.dart';
+import 'unknown.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -17,12 +23,18 @@ class _HomePageState extends State<HomePage> {
   final MapController mapController = MapController();
   LatLng? _currentPosition;
 
+  // Notification state
+  List notifications = [];
+  bool notificationLoading = true;
+
   @override
   void initState() {
     super.initState();
     _getCurrentLocation();
+    _loadNotifications();
   }
 
+  // ===================== LOCATION =====================
   Future<void> _getCurrentLocation() async {
     bool serviceEnabled;
     LocationPermission permission;
@@ -38,13 +50,14 @@ class _HomePageState extends State<HomePage> {
 
     try {
       final position = await Geolocator.getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.high);
+        desiredAccuracy: LocationAccuracy.high,
+      );
 
       setState(() {
         _currentPosition = LatLng(position.latitude, position.longitude);
       });
 
-      mapController.move(_currentPosition!, 15); // Zoomed closer
+      mapController.move(_currentPosition!, 15);
     } catch (e) {
       debugPrint("Location error: $e");
     }
@@ -56,22 +69,152 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  // ===================== NOTIFICATIONS =====================
+  Future<void> _loadNotifications() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      String? userId = prefs.getString('userId');
+
+      if (userId == null) {
+        setState(() => notificationLoading = false);
+        return;
+      }
+
+      final data = await NotificationService.fetchNotifications(userId);
+      setState(() {
+        notifications = data;
+        notificationLoading = false;
+      });
+    } catch (e) {
+      debugPrint("Notification error: $e");
+      setState(() => notificationLoading = false);
+    }
+  }
+
+  // ===================== UI =====================
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
+
+      // ===================== DRAWER =====================
+      drawer: Drawer(
+        child: Column(
+          children: [
+            DrawerHeader(
+              decoration: const BoxDecoration(color: Colors.blueAccent),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: const [
+                  Icon(Icons.volunteer_activism,
+                      color: Colors.white, size: 40),
+                  SizedBox(height: 10),
+                  Text(
+                    "Sahaya",
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold),
+                  ),
+                  Text(
+                    "Disaster & Missing Person Help",
+                    style: TextStyle(color: Colors.white70),
+                  ),
+                ],
+              ),
+            ),
+            drawerItem(
+              context,
+              icon: Icons.home,
+              title: "Home",
+              onTap: () => Navigator.pop(context),
+            ),
+            drawerItem(
+              context,
+              icon: Icons.person_search,
+              title: "Register Missing Person",
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => const RegisterMissingPerson()),
+                );
+              },
+            ),
+            const SizedBox(height: 12),
+            drawerItem(
+              context,
+              icon: Icons.warning,
+              title: "SOS",
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const SosPage()),
+                );
+              },
+            ),
+            drawerItem(
+              context,
+              icon: Icons.medical_services,
+              title: "First Aid Guide",
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => const FirstAidVoicePage()),
+                );
+              },
+            ),
+            const Spacer(),
+            const Divider(),
+            drawerItem(
+              context,
+              icon: Icons.logout,
+              title: "Logout",
+              onTap: () => Navigator.pop(context),
+            ),
+          ],
+        ),
+      ),
+
+      // ===================== BODY =====================
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // 🔔 TOP MATCH NOTIFICATION
+              if (!notificationLoading && notifications.isNotEmpty)
+                TopMatchNotification(
+                  personName:
+                  notifications[0]["relatedMissingPerson"]["name"],
+                  similarity:
+                  notifications[0]["relatedMatch"]["similarity"].toDouble(),
+                  phone: notifications[0]["relatedMissingPerson"]
+                  ["registeredBy"]["phone"],
+                ),
+
               const SizedBox(height: 10),
+
+              // -------- Top Bar --------
               Row(
-                children: const [
-                  Icon(Icons.waves, color: Colors.blueAccent, size: 30),
-                  SizedBox(width: 8),
-                  Text(
+                children: [
+                  Builder(
+                    builder: (context) => IconButton(
+                      icon: const Icon(Icons.menu,
+                          color: Colors.blueAccent, size: 30),
+                      onPressed: () => Scaffold.of(context).openDrawer(),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const Icon(Icons.waves,
+                      color: Colors.blueAccent, size: 30),
+                  const SizedBox(width: 8),
+                  const Text(
                     "Sahaya",
                     style: TextStyle(
                       color: Colors.blueAccent,
@@ -81,7 +224,10 @@ class _HomePageState extends State<HomePage> {
                   ),
                 ],
               ),
+
               const SizedBox(height: 20),
+
+              // -------- Welcome --------
               Text(
                 "Welcome to Sahaya",
                 style: TextStyle(
@@ -98,118 +244,58 @@ class _HomePageState extends State<HomePage> {
                 "Your lifeline for disaster relief",
                 style: TextStyle(color: Colors.black54),
               ),
-              const SizedBox(height: 20),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.red.shade100.withOpacity(0.4),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.red.shade400),
-                ),
-                child: const Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(Icons.warning_amber_rounded, color: Colors.redAccent),
-                        SizedBox(width: 8),
-                        Text("Weather Alert",
-                            style: TextStyle(
-                                color: Colors.redAccent,
-                                fontWeight: FontWeight.bold)),
-                      ],
-                    ),
-                    SizedBox(height: 6),
-                    Text("Flood warning expected",
-                        style: TextStyle(color: Colors.black54)),
-                  ],
-                ),
-              ),
+
               const SizedBox(height: 20),
 
-              // SOS + First Aid Buttons with navigation
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () {
-                        // Navigate to SOS page
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (context) => const SosPage()),
-                        );
-                      },
-                      child: Container(
-                        height: 120,
-                        margin: const EdgeInsets.only(right: 8),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(16),
-                          gradient: const LinearGradient(
-                            colors: [Colors.red, Colors.redAccent],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                        ),
-                        child: const Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.shield, color: Colors.white, size: 40),
-                              SizedBox(height: 8),
-                              Text("SOS",
-                                  style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold)),
-                              Text("EMERGENCY",
-                                  style: TextStyle(
-                                      color: Colors.white70, fontSize: 12)),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  Expanded(
-                    child: Container(
-                      height: 120,
-                      margin: const EdgeInsets.only(left: 8),
-                      decoration: BoxDecoration(
-                        color: Colors.blueAccent,
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: const Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.mic, color: Colors.white, size: 40),
-                            SizedBox(height: 8),
-                            Text("FIRST AID",
-                                style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold)),
-                            Text("GUIDE",
-                                style: TextStyle(
-                                    color: Colors.white70, fontSize: 12)),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
+              // -------- ACTION BUTTONS --------
+              primaryActionButton(
+                title: "Register Unknown Person",
+                subtitle: "Found Person",
+                icon: Icons.person_search,
+                color: Colors.green,
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => const RegisterUnknownPerson()),
+                ),
               ),
+
+              const SizedBox(height: 12),
+
+              primaryActionButton(
+                title: "SOS Emergency",
+                subtitle: "Immediate Help",
+                icon: Icons.shield,
+                color: Colors.red,
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const SosPage()),
+                ),
+              ),
+
+              const SizedBox(height: 12),
+
+              primaryActionButton(
+                title: "First Aid Guide",
+                subtitle: "Voice Assistant",
+                icon: Icons.mic,
+                color: Colors.blueAccent,
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => const FirstAidVoicePage()),
+                ),
+              ),
+
               const SizedBox(height: 20),
 
-              // Map Section
+              // -------- MAP --------
               Container(
                 height: 350,
                 decoration: BoxDecoration(
-                  color: Colors.white,
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.blueAccent.withOpacity(0.5)),
+                  border:
+                  Border.all(color: Colors.blueAccent.withOpacity(0.5)),
                 ),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(16),
@@ -218,9 +304,9 @@ class _HomePageState extends State<HomePage> {
                       FlutterMap(
                         mapController: mapController,
                         options: MapOptions(
-                          center: _currentPosition ?? LatLng(11.8, 76.0),
-                          zoom: 15.0,
-                          interactiveFlags: InteractiveFlag.all,
+                          center:
+                          _currentPosition ?? const LatLng(11.8, 76.0),
+                          zoom: 15,
                         ),
                         children: [
                           TileLayer(
@@ -249,10 +335,11 @@ class _HomePageState extends State<HomePage> {
                         bottom: 12,
                         right: 12,
                         child: FloatingActionButton(
-                          backgroundColor: Colors.blueAccent,
                           mini: true,
+                          backgroundColor: Colors.blueAccent,
                           onPressed: _recenterMap,
-                          child: const Icon(Icons.my_location, color: Colors.white),
+                          child: const Icon(Icons.my_location,
+                              color: Colors.white),
                         ),
                       ),
                     ],
@@ -261,6 +348,68 @@ class _HomePageState extends State<HomePage> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  // ===================== HELPERS =====================
+  Widget drawerItem(BuildContext context,
+      {required IconData icon,
+        required String title,
+        required VoidCallback onTap}) {
+    return ListTile(
+      leading: Icon(icon, color: Colors.blueAccent),
+      title: Text(title),
+      onTap: onTap,
+    );
+  }
+
+  Widget primaryActionButton({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: color,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(vertical: 18),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          elevation: 2,
+        ),
+        onPressed: onTap,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 26),
+            const SizedBox(width: 12),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Text(
+                  subtitle,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Colors.white70,
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );
