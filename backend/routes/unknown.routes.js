@@ -94,7 +94,7 @@ router.post("/upload", upload.single("photo"), async (req, res) => {
     console.log("✅ Unknown saved:", unknown._id.toString());
 
     // 3️⃣ Respond IMMEDIATELY
-    res.json({
+    res.status(201).json({
       message: "Unknown person saved. Matching running in background.",
       unknownPersonId: unknown._id,
     });
@@ -140,7 +140,7 @@ async function runMatchingInBackground(unknown, embedding) {
         else if (similarity >= 0.85) confidence = "medium";
 
         // Store match record
-        await Match.create({
+        const matchRecord = await Match.create({
           missingPerson: person._id,
           unknownPerson: unknown._id,
           similarity,
@@ -148,7 +148,19 @@ async function runMatchingInBackground(unknown, embedding) {
           status: "pending",
         });
 
-        // Notify missing person reporter
+        // Update missing person status to "found"
+        await MissingPerson.findByIdAndUpdate(person._id, {
+          status: "found",
+          matchedUnknown: unknown._id,
+        });
+
+        // Update unknown person status to "identified"
+        await UnknownPerson.findByIdAndUpdate(unknown._id, {
+          status: "identified",
+          matchedMissing: person._id,
+        });
+
+        // Notify missing person reporter (show unknown person reporter's contact)
         if (person.registeredBy) {
           await Notification.create({
             userId: person.registeredBy,
@@ -158,6 +170,23 @@ async function runMatchingInBackground(unknown, embedding) {
               similarity * 100
             ).toFixed(2)}% similarity). Please verify.`,
             relatedMissingPerson: person._id,
+            relatedUnknownPerson: unknown._id,
+            relatedMatch: matchRecord._id,
+          });
+        }
+
+        // Notify unknown person reporter (show missing person reporter's contact)
+        if (unknown.reportedBy) {
+          await Notification.create({
+            userId: unknown.reportedBy,
+            type: "match",
+            title: "Match Found for Unknown Person",
+            message: `The unknown person you reported matches ${person.name} (${(
+              similarity * 100
+            ).toFixed(2)}% similarity). Please verify.`,
+            relatedMissingPerson: person._id,
+            relatedUnknownPerson: unknown._id,
+            relatedMatch: matchRecord._id,
           });
         }
       }

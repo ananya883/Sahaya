@@ -81,6 +81,14 @@ class _HomePageState extends State<HomePage> {
       }
 
       final data = await NotificationService.fetchNotifications(userId);
+      
+      // Debug: Print notification data
+      if (data.isNotEmpty) {
+        debugPrint("📢 Notification data: ${data[0]}");
+        debugPrint("📢 Missing person: ${data[0]["relatedMissingPerson"]}");
+        debugPrint("📢 Unknown person: ${data[0]["relatedUnknownPerson"]}");
+      }
+      
       setState(() {
         notifications = data;
         notificationLoading = false;
@@ -90,6 +98,57 @@ class _HomePageState extends State<HomePage> {
       setState(() => notificationLoading = false);
     }
   }
+
+  // Helper to safely parse similarity value
+  double _parseSimilarity(dynamic value) {
+    if (value == null) return 0.0;
+    if (value is double) return value;
+    if (value is int) return value.toDouble();
+    if (value is String) return double.tryParse(value) ?? 0.0;
+    return 0.0;
+  }
+
+  // Helper to get the correct contact number from notification
+  String _getContactNumber(Map<String, dynamic> notification) {
+    debugPrint("🔍 Getting contact number from notification...");
+    debugPrint("🔍 Full notification: $notification");
+    
+    // Try to get unknown person reporter's mobile first
+    debugPrint("🔍 relatedUnknownPerson: ${notification["relatedUnknownPerson"]}");
+    final unknownPerson = notification["relatedUnknownPerson"];
+    if (unknownPerson != null) {
+      debugPrint("🔍 reportedBy: ${unknownPerson["reportedBy"]}");
+      final reportedBy = unknownPerson["reportedBy"];
+      if (reportedBy != null) {
+        debugPrint("🔍 reportedBy mobile: ${reportedBy["mobile"]}");
+        final unknownMobile = reportedBy["mobile"];
+        if (unknownMobile != null && unknownMobile.toString().isNotEmpty) {
+          debugPrint("✅ Found unknown person mobile: $unknownMobile");
+          return unknownMobile.toString();
+        }
+      }
+    }
+    
+    // Fallback to missing person reporter's mobile
+    debugPrint("🔍 relatedMissingPerson: ${notification["relatedMissingPerson"]}");
+    final missingPerson = notification["relatedMissingPerson"];
+    if (missingPerson != null) {
+      debugPrint("🔍 registeredBy: ${missingPerson["registeredBy"]}");
+      final registeredBy = missingPerson["registeredBy"];
+      if (registeredBy != null) {
+        debugPrint("🔍 registeredBy mobile: ${registeredBy["mobile"]}");
+        final missingMobile = registeredBy["mobile"];
+        if (missingMobile != null && missingMobile.toString().isNotEmpty) {
+          debugPrint("✅ Found missing person mobile: $missingMobile");
+          return missingMobile.toString();
+        }
+      }
+    }
+    
+    debugPrint("❌ No mobile number found, returning N/A");
+    return "N/A";
+  }
+
 
   // ===================== UI =====================
   @override
@@ -190,12 +249,17 @@ class _HomePageState extends State<HomePage> {
               // 🔔 TOP MATCH NOTIFICATION
               if (!notificationLoading && notifications.isNotEmpty)
                 TopMatchNotification(
+                  notificationId: notifications[0]["_id"]?.toString() ?? "0",
                   personName:
-                  notifications[0]["relatedMissingPerson"]["name"],
-                  similarity:
-                  notifications[0]["relatedMatch"]["similarity"].toDouble(),
-                  phone: notifications[0]["relatedMissingPerson"]
-                  ["registeredBy"]["phone"],
+                  notifications[0]["relatedMissingPerson"]?["name"] ?? "Unknown",
+                  similarity: _parseSimilarity(
+                      notifications[0]["relatedMatch"]?["similarity"]),
+                  phone: _getContactNumber(notifications[0]),
+                  onDismiss: () {
+                    setState(() {
+                      notifications.removeAt(0);
+                    });
+                  },
                 ),
 
               const SizedBox(height: 10),

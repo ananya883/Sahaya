@@ -80,9 +80,14 @@ class _RegisterUnknownPersonState extends State<RegisterUnknownPerson> {
 
     setState(() => loading = false);
 
+    if (!mounted) return;
+
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text("Unknown person registered successfully")),
     );
+
+    // Navigate back to homepage to see match notifications
+    Navigator.pop(context);
   }
 
   @override

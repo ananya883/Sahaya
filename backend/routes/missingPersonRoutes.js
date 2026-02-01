@@ -133,7 +133,7 @@ async function runMatchingInBackground(person, embedding) {
         else if (similarity >= 0.85) confidence = "medium";
 
         // Store match record
-        await Match.create({
+        const matchRecord = await Match.create({
           missingPerson: person._id,
           unknownPerson: unknown._id,
           similarity,
@@ -150,6 +150,8 @@ async function runMatchingInBackground(person, embedding) {
             similarity * 100
           ).toFixed(2)}% similarity). Please verify.`,
           relatedMissingPerson: person._id,
+          relatedUnknownPerson: unknown._id,
+          relatedMatch: matchRecord._id,
         });
       }
     }
