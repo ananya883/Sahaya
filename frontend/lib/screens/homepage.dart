@@ -6,11 +6,13 @@ import 'package:geolocator/geolocator.dart';
 
 import '../widgets/top_match_notification.dart';
 import '../services/notification_service.dart';
+import '../services/camp_service.dart';
 
 import 'register_missing_person.dart';
 import 'sos_page.dart';
 import 'first_aid_voice_page.dart';
 import 'unknown.dart';
+import 'fullscreen_map.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -27,11 +29,16 @@ class _HomePageState extends State<HomePage> {
   List notifications = [];
   bool notificationLoading = true;
 
+  // Camp state
+  List camps = [];
+  bool campsLoading = true;
+
   @override
   void initState() {
     super.initState();
     _getCurrentLocation();
     _loadNotifications();
+    _loadCamps();
   }
 
   // ===================== LOCATION =====================
@@ -99,6 +106,20 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  // ===================== CAMPS =====================
+  Future<void> _loadCamps() async {
+    try {
+      final data = await CampService.fetchCamps();
+      setState(() {
+        camps = data;
+        campsLoading = false;
+      });
+    } catch (e) {
+      debugPrint("Camp fetch error: $e");
+      setState(() => campsLoading = false);
+    }
+  }
+
   // Helper to safely parse similarity value
   double _parseSimilarity(dynamic value) {
     if (value == null) return 0.0;
@@ -147,6 +168,92 @@ class _HomePageState extends State<HomePage> {
     
     debugPrint("❌ No mobile number found, returning N/A");
     return "N/A";
+  }
+
+  // Show camp details in bottom sheet
+  void _showCampDetails(Map<String, dynamic> camp) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.location_city, color: Colors.green, size: 30),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    camp['name'] ?? 'Camp',
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.blueAccent,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const Divider(height: 24),
+            if (camp['location'] != null) ...[
+              _detailRow(Icons.place, 'Location', camp['location']),
+              const SizedBox(height: 8),
+            ],
+            if (camp['capacity'] != null) ...[
+              _detailRow(Icons.people, 'Capacity', '${camp['capacity']} people'),
+              const SizedBox(height: 8),
+            ],
+            if (camp['status'] != null) ...[
+              _detailRow(
+                Icons.info_outline,
+                'Status',
+                camp['status'],
+                color: camp['status'] == 'active' ? Colors.green : Colors.orange,
+              ),
+            ],
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blueAccent,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Close', style: TextStyle(color: Colors.white)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _detailRow(IconData icon, String label, String value, {Color? color}) {
+    return Row(
+      children: [
+        Icon(icon, color: Colors.blueAccent, size: 20),
+        const SizedBox(width: 8),
+        Text(
+          '$label: ',
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: TextStyle(color: color ?? Colors.black87),
+          ),
+        ),
+      ],
+    );
   }
 
 
@@ -201,29 +308,16 @@ class _HomePageState extends State<HomePage> {
                 );
               },
             ),
-            const SizedBox(height: 12),
             drawerItem(
               context,
-              icon: Icons.warning,
-              title: "SOS",
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const SosPage()),
-                );
-              },
-            ),
-            drawerItem(
-              context,
-              icon: Icons.medical_services,
-              title: "First Aid Guide",
+              icon: Icons.person_add,
+              title: "Register Unknown Person",
               onTap: () {
                 Navigator.pop(context);
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                      builder: (_) => const FirstAidVoicePage()),
+                      builder: (_) => const RegisterUnknownPerson()),
                 );
               },
             ),
@@ -313,23 +407,9 @@ class _HomePageState extends State<HomePage> {
 
               // -------- ACTION BUTTONS --------
               primaryActionButton(
-                title: "Register Unknown Person",
-                subtitle: "Found Person",
-                icon: Icons.person_search,
-                color: Colors.green,
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (_) => const RegisterUnknownPerson()),
-                ),
-              ),
-
-              const SizedBox(height: 12),
-
-              primaryActionButton(
                 title: "SOS Emergency",
                 subtitle: "Immediate Help",
-                icon: Icons.shield,
+                icon: Icons.warning_rounded,
                 color: Colors.red,
                 onTap: () => Navigator.push(
                   context,
@@ -342,7 +422,7 @@ class _HomePageState extends State<HomePage> {
               primaryActionButton(
                 title: "First Aid Guide",
                 subtitle: "Voice Assistant",
-                icon: Icons.mic,
+                icon: Icons.medical_services_rounded,
                 color: Colors.blueAccent,
                 onTap: () => Navigator.push(
                   context,
@@ -392,6 +472,32 @@ class _HomePageState extends State<HomePage> {
                                   ),
                                 ),
                               ],
+                            ),
+                          // Camp markers
+                          if (camps.isNotEmpty)
+                            MarkerLayer(
+                              markers: camps.map((camp) {
+                                final lat = camp['latitude'];
+                                final lng = camp['longitude'];
+                                if (lat == null || lng == null) return null;
+                                
+                                return Marker(
+                                  point: LatLng(
+                                    lat is double ? lat : double.parse(lat.toString()),
+                                    lng is double ? lng : double.parse(lng.toString()),
+                                  ),
+                                  width: 40,
+                                  height: 40,
+                                  child: GestureDetector(
+                                    onTap: () => _showCampDetails(camp),
+                                    child: const Icon(
+                                      Icons.location_city,
+                                      color: Colors.green,
+                                      size: 35,
+                                    ),
+                                  ),
+                                );
+                              }).whereType<Marker>().toList(),
                             ),
                         ],
                       ),

@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 import 'package:path/path.dart';
 
 class UnknownPersonService {
-  static const String baseUrl = "http://10.49.2.38:5001/api/unknown";
+  static const String baseUrl = "http://192.168.1.6:5001/api/unknown";
 
   static Future<void> registerUnknownPerson({
     required String gender,

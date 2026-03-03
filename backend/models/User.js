@@ -3,7 +3,7 @@ import mongoose from "mongoose";
 const userSchema = new mongoose.Schema(
   {
     // User Details
-   Name: { type: String, required: true },
+    Name: { type: String, required: true },
     gender: { type: String, required: true },
     dob: { type: String, required: true }, // Can also use Date type if preferred
     mobile: { type: String, required: true },
@@ -12,16 +12,33 @@ const userSchema = new mongoose.Schema(
     address: { type: String, required: true },
     houseNo: { type: String, required: true },
 
-    // Guardian Details
-    guardianName: { type: String, required: true },
-    guardianRelation: { type: String, required: true },
-    guardianMobile: { type: String, required: true },
-    guardianEmail: { type: String, required: true },
-    guardianAddress: { type: String, required: true },
-   isEmailVerified: { type: Boolean, default: false },
-  emailOtp: { type: String },
-  emailOtpExpires: { type: Date },
-   
+    // Role (user or volunteer)
+    role: {
+      type: String,
+      enum: ["user", "volunteer"],
+      default: "user"
+    },
+
+    // Volunteer Specific Details
+    volunteerDetails: {
+      skills: { type: [String], default: [] },
+      trainingAttended: { type: Boolean, default: false },
+      serviceLocation: { type: String },
+      govtIdPath: { type: String },        // Path to uploaded ID
+      certificatesPath: { type: String },  // Path to uploaded Certs
+    },
+
+    // Guardian Details (Optional for volunteers)
+    guardianName: { type: String },
+    guardianRelation: { type: String },
+    guardianMobile: { type: String },
+    guardianEmail: { type: String },
+    guardianAddress: { type: String },
+
+    isEmailVerified: { type: Boolean, default: false },
+    emailOtp: { type: String },
+    emailOtpExpires: { type: Date },
+
     otp: { type: String },
     otpExpires: { type: Date },
   },

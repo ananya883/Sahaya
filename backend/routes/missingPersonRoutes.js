@@ -52,7 +52,7 @@ router.post("/register", upload.single("photo"), async (req, res) => {
 
     let embedding = null;
     try {
-      // 1️⃣ Send REAL IMAGE FILE to AI service
+      
       const formData = new FormData();
       formData.append("image", fs.createReadStream(imagePath));
 

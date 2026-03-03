@@ -2,7 +2,7 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 
 class MissingPersonService {
-  static const String baseUrl = "http://10.49.2.38:5001/api/missing";
+  static const String baseUrl = "http://192.168.1.6:5001/api/missing";
 
   static Future<void> registerMissingPerson({
     required String name,

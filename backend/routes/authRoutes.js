@@ -7,7 +7,35 @@ import nodemailer from "nodemailer";
 import User from "../models/User.js";
 import PreUser from "../models/preUser.js";
 
+import path from "path";
+import multer from "multer";
+import fs from "fs";
+import { fileURLToPath } from "url";
+
 const router = express.Router();
+
+// ------------------------
+// Multer Configuration
+// ------------------------
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Ensure uploads directory exists
+const uploadDir = path.join(__dirname, "../uploads");
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    cb(null, Date.now() + "-" + file.originalname);
+  },
+});
+
+const upload = multer({ storage });
 
 // ------------------------
 // Validation Regex
@@ -139,96 +167,205 @@ router.post("/verify-email-otp", async (req, res) => {
 // ------------------------
 // REGISTER USER
 // ------------------------
-router.post("/register", async (req, res) => {
-  try {
-    const {
-      Name,
-      gender,
-      dob,
-      mobile,
-      email,
-      address,
-      houseNo,
-      guardianName,
-      guardianRelation,
-      guardianMobile,
-      guardianEmail,
-      guardianAddress,
-    } = req.body;
+// ------------------------
+// REGISTER USER
+// ------------------------
+router.post(
+  "/register",
+  upload.fields([
+    { name: "govtId", maxCount: 1 },
+    { name: "certificate", maxCount: 1 },
+  ]),
+  async (req, res) => {
+    console.log("👉 [REGISTER] Request received");
+    try {
+      // Parse body (handled by multer, fields are in req.body)
+      const {
+        Name,
+        gender,
+        dob,
+        mobile,
+        email,
+        address,
+        houseNo,
+        // Guardian fields (optional for volunteers)
+        guardianName,
+        guardianRelation,
+        guardianMobile,
+        guardianEmail,
+        guardianAddress,
+        // Role & Volunteer fields
+        role, // "user" or "volunteer"
+        password, // Manual password for volunteers
+        skills,
+        trainingAttended,
+        serviceLocation,
+      } = req.body;
 
-    // Check OTP verification
-    const preUser = await PreUser.findOne({ email });
-    if (!preUser || !preUser.isVerified) {
-      return res.status(400).json({ error: "Email not verified" });
+      console.log(`👉 [REGISTER] Payload: Name=${Name}, Email=${email}, Role=${role}`);
+
+      const userRole = role || "user";
+
+      // Check OTP verification (Optional: You might want to skip this for volunteers if they don't do OTP flow first? 
+      // Assuming they DO email verification first just like users)
+      const preUser = await PreUser.findOne({ email });
+      if (!preUser || !preUser.isVerified) {
+        console.log("❌ [REGISTER] Email not verified");
+        return res.status(400).json({ error: "Email not verified" });
+      }
+
+      // Check existing user
+      const existingUser = await User.findOne({ email });
+      if (existingUser) {
+        console.log("❌ [REGISTER] User already exists");
+        return res.status(400).json({ error: "User already exists" });
+      }
+
+      // --- Validation ---
+      // Common fields
+      if (
+        !Name ||
+        !gender ||
+        !dob ||
+        !mobile ||
+        !email ||
+        !address ||
+        !houseNo
+      ) {
+        console.log("❌ [REGISTER] Missing basic fields");
+        return res.status(400).json({ error: "Basic fields are required" });
+      }
+
+      // Guardian fields required ONLY if role === 'user'
+      if (userRole === "user") {
+        if (
+          !guardianName ||
+          !guardianRelation ||
+          !guardianMobile ||
+          !guardianEmail ||
+          !guardianAddress
+        ) {
+          console.log("❌ [REGISTER] Missing guardian fields for user");
+          return res.status(400).json({ error: "Guardian fields are required for users" });
+        }
+      }
+
+      if (!emailRegex.test(email)) {
+        return res.status(400).json({ error: "Invalid email format" });
+      }
+      if (!mobileRegex.test(mobile)) {
+        return res.status(400).json({ error: "Invalid mobile number" });
+      }
+
+      // --- Password Handling ---
+      let finalPassword = "";
+      let isManualPassword = false;
+
+      if (password && password.trim().length > 0) {
+        // Use provided password (e.g. for volunteers)
+        finalPassword = password;
+        isManualPassword = true;
+      } else {
+        // Generate random password (legacy flow)
+        finalPassword = Math.random().toString(36).slice(-8);
+      }
+
+      const hashedPassword = await bcrypt.hash(finalPassword, 10);
+
+      // --- File Uploads (Volunteer) ---
+      let govtIdPath = "";
+      let certificatesPath = "";
+
+      if (req.files) {
+        console.log("👉 [REGISTER] Processing files...");
+        if (req.files.govtId) govtIdPath = req.files.govtId[0].path;
+        if (req.files.certificate) certificatesPath = req.files.certificate[0].path;
+      }
+
+      // --- Create User ---
+      const newUser = new User({
+        Name,
+        gender,
+        dob,
+        mobile,
+        email,
+        password: hashedPassword,
+        address,
+        houseNo,
+        role: userRole,
+
+        // Guardian info (might be undefined if volunteer, which is fine now)
+        guardianName,
+        guardianRelation,
+        guardianMobile,
+        guardianEmail,
+        guardianAddress,
+
+        // Volunteer info
+        volunteerDetails: {
+          skills: skills ? skills.split(",") : [], // If sent as comma-separated string
+          trainingAttended: trainingAttended === "true" || trainingAttended === true,
+          serviceLocation,
+          govtIdPath,
+          certificatesPath,
+        },
+
+        isEmailVerified: true,
+      });
+
+      console.log("👉 [REGISTER] Saving user to DB...");
+      await newUser.save();
+      console.log("✅ [REGISTER] User saved to DB");
+
+      await PreUser.deleteOne({ email });
+
+      // Send email
+      console.log("👉 [REGISTER] Attempting to send email...");
+      try {
+        if (isManualPassword) {
+          // Just welcome email
+          await transporter.sendMail({
+            from: `"Sahaya Support" <disasterrelief.sahaya@gmail.com>`,
+            to: email,
+            subject: "Welcome to Sahaya",
+            html: `
+              <h3>Welcome, ${Name}</h3>
+              <p>Your Sahaya volunteer account has been created successfully.</p>
+              <p>You can now login with your chosen password.</p>
+            `,
+          });
+          console.log("✅ [REGISTER] Welcome email sent");
+          res.json({ message: "Volunteer registered successfully." });
+        } else {
+          // Send generated password
+          await transporter.sendMail({
+            from: `"Sahaya Support" <disasterrelief.sahaya@gmail.com>`,
+            to: email,
+            subject: "Your Sahaya Account Password",
+            html: `
+                <h3>Welcome, ${Name}</h3>
+                <p>Your Sahaya account has been created successfully.</p>
+                <p><b>Login Password:</b> ${finalPassword}</p>
+                <p>Please keep this password safe.</p>
+              `,
+          });
+          console.log("✅ [REGISTER] Password email sent");
+          res.json({
+            message: "User registered successfully. Password sent to email.",
+          });
+        }
+      } catch (emailErr) {
+        console.error("⚠️ [REGISTER] Email sending failed but user registered:", emailErr);
+        // Still return success because user IS registered
+        res.json({ message: "User registered successfully (Email could not be sent)." });
+      }
+
+    } catch (err) {
+      console.error("❌ [REGISTER] Register error:", err);
+      res.status(500).json({ error: "Registration failed" });
     }
-
-    // Check existing user
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res.status(400).json({ error: "User already exists" });
-    }
-
-    // Validate required fields
-    if (
-      !Name || !gender || !dob || !mobile || !email || !address ||
-      !houseNo || !guardianName || !guardianRelation ||
-      !guardianMobile || !guardianEmail || !guardianAddress
-    ) {
-      return res.status(400).json({ error: "All fields are required" });
-    }
-
-    if (!emailRegex.test(email) || !emailRegex.test(guardianEmail)) {
-      return res.status(400).json({ error: "Invalid email format" });
-    }
-
-    if (!mobileRegex.test(mobile) || !mobileRegex.test(guardianMobile)) {
-      return res.status(400).json({ error: "Invalid mobile number" });
-    }
-
-    // Generate password
-    const randomPassword = Math.random().toString(36).slice(-8);
-    const hashedPassword = await bcrypt.hash(randomPassword, 10);
-
-    const newUser = new User({
-      Name,
-      gender,
-      dob,
-      mobile,
-      email,
-      password: hashedPassword,
-      address,
-      houseNo,
-      guardianName,
-      guardianRelation,
-      guardianMobile,
-      guardianEmail,
-      guardianAddress,
-      isEmailVerified: true,
-    });
-
-    await newUser.save();
-    await PreUser.deleteOne({ email });
-
-    await transporter.sendMail({
-      from: `"Sahaya Support" <disasterrelief.sahaya@gmail.com>`,
-      to: email,
-      subject: "Your Sahaya Account Password",
-      html: `
-        <h3>Welcome, ${Name}</h3>
-        <p>Your Sahaya account has been created successfully.</p>
-        <p><b>Login Password:</b> ${randomPassword}</p>
-        <p>Please keep this password safe.</p>
-      `,
-    });
-
-    res.json({
-      message: "User registered successfully. Password sent to email.",
-    });
-  } catch (err) {
-    console.error("Register error:", err);
-    res.status(500).json({ error: "Registration failed" });
   }
-});
+);
 
 // ------------------------
 // LOGIN USER
@@ -258,6 +395,7 @@ router.post("/login", async (req, res) => {
         Name: user.Name,
         email: user.email,
         mobile: user.mobile,
+        role: user.role || "user", // valid roles: 'user', 'volunteer'
       },
     });
   } catch (err) {

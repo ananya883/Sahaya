@@ -7,7 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
 class ApiService {
-  static const String baseUrl = "http://10.49.2.38:5001";
+  static const String baseUrl = "http://192.168.1.6:5001";
 
   static Future<http.Response> loginUser(String email, String password) async {
     final url = Uri.parse('$baseUrl/api/auth/login');
@@ -125,5 +125,61 @@ class ApiService {
 
     final streamedResponse = await request.send();
     return await http.Response.fromStream(streamedResponse);
+  }
+  // ----------------- Register Volunteer -----------------
+  static Future<http.StreamedResponse> registerVolunteer({
+    required String name,
+    required String email,
+    required String password,
+    required String mobile,
+    required String gender,
+    required String dob,
+    required String address,
+    required String houseNo,
+    required List<String> skills,
+    required bool trainingAttended,
+    required String serviceLocation,
+    File? govtIdFile,
+    File? certificateFile,
+  }) async {
+    final url = Uri.parse('$baseUrl/api/auth/register');
+    final request = http.MultipartRequest('POST', url);
+
+    // Basic Fields
+    request.fields['Name'] = name;
+    request.fields['email'] = email;
+    request.fields['password'] = password;
+    request.fields['mobile'] = mobile;
+    request.fields['gender'] = gender;
+    request.fields['dob'] = dob;
+    request.fields['address'] = address;
+    request.fields['houseNo'] = houseNo;
+    request.fields['role'] = 'volunteer';
+
+    // Volunteer Fields
+    request.fields['skills'] = skills.join(',');
+    request.fields['trainingAttended'] = trainingAttended.toString();
+    request.fields['serviceLocation'] = serviceLocation;
+
+    // Files
+    if (govtIdFile != null) {
+      final fileName = path.basename(govtIdFile.path);
+      request.files.add(await http.MultipartFile.fromPath(
+        'govtId',
+        govtIdFile.path,
+        filename: fileName,
+      ));
+    }
+
+    if (certificateFile != null) {
+      final fileName = path.basename(certificateFile.path);
+      request.files.add(await http.MultipartFile.fromPath(
+        'certificate',
+        certificateFile.path,
+        filename: fileName,
+      ));
+    }
+
+    return await request.send();
   }
 }

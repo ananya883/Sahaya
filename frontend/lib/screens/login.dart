@@ -3,6 +3,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import 'homepage.dart';
+import 'volunteer_home.dart';
+import 'volunteer_register.dart';
 
 const Color _primaryColor = Color(0xFF1E88E5);
 const double _headerHeight = 220.0;
@@ -58,10 +60,17 @@ class _LoginPageState extends State<LoginPage> {
         await prefs.setString('userName', userName);
 
         // Navigate to HomePage
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => HomePage()), // Pass userName if needed
-        );
+        if (data['user']['role'] == 'volunteer') {
+           Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const VolunteerHome()),
+          );
+        } else {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => HomePage()),
+          );
+        }
       } else {
         final data = jsonDecode(response.body);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -160,9 +169,23 @@ class _LoginPageState extends State<LoginPage> {
                 const SizedBox(height: 30),
 
                 // Links
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  spacing: 10,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.pushNamed(context, '/register'),
+                      child: const Text("Create Account", style: TextStyle(color: _primaryColor, fontSize: 16)),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const VolunteerRegisterPage())),
+                      child: const Text("Volunteer Sign-up", style: TextStyle(color: Colors.green, fontSize: 16)),
+                    ),
+                  ],
+                ),
                 TextButton(
-                  onPressed: () => Navigator.pushNamed(context, '/register'),
-                  child: const Text("Create Account", style: TextStyle(color: _primaryColor, fontSize: 16)),
+                  onPressed: () => Navigator.pushNamed(context, '/forgot'),
+                  child: const Text("Forgot Password?", style: TextStyle(color: Colors.grey, fontSize: 16)),
                 ),
                 TextButton(
                   onPressed: () => Navigator.pushNamed(context, '/forgot'),

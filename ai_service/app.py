@@ -60,7 +60,7 @@ def cosine_similarity(vec1, vec2):
 # -----------------------------
 @app.route('/extract', methods=['POST'])
 def extract():
-    # Check for file upload (multipart/form-data)
+    # Check for file upl  oad (multipart/form-data)
     if 'image' in request.files:
         print("📸 [AI] Received image file upload", flush=True)
         image_file = request.files['image']

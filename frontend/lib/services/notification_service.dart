@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 
 class NotificationService {
   static const String baseUrl =
-      "http://10.49.2.38:5001/api/notifications";
+      "http://192.168.1.6:5001/api/notifications";
 
   static Future<List<dynamic>> fetchNotifications(String userId) async {
     final res = await http.get(Uri.parse("$baseUrl/$userId"));
@@ -15,4 +15,3 @@ class NotificationService {
     }
   }
 }
-`

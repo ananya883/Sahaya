@@ -24,7 +24,7 @@ class _RegisterUnknownPersonState extends State<RegisterUnknownPerson> {
   File? image;
   bool loading = false;
 
-  final Color primaryGreen = Colors.green;
+  final Color primaryBlue = Colors.blueAccent;
 
   Future<void> pickImage() async {
     final picked = await ImagePicker().pickImage(source: ImageSource.gallery);
@@ -96,7 +96,7 @@ class _RegisterUnknownPersonState extends State<RegisterUnknownPerson> {
       backgroundColor: Colors.white,
       appBar: AppBar(
         title: const Text("Register Found Person"),
-        backgroundColor: primaryGreen,
+        backgroundColor: primaryBlue,
         foregroundColor: Colors.white,
         centerTitle: true,
       ),
@@ -117,8 +117,8 @@ class _RegisterUnknownPersonState extends State<RegisterUnknownPerson> {
               // Date Picker
               OutlinedButton.icon(
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: primaryGreen,
-                  side: BorderSide(color: primaryGreen),
+                  foregroundColor: primaryBlue,
+                  side: BorderSide(color: primaryBlue),
                 ),
                 onPressed: pickDate,
                 icon: const Icon(Icons.date_range),
@@ -137,8 +137,8 @@ class _RegisterUnknownPersonState extends State<RegisterUnknownPerson> {
               // Image Picker
               OutlinedButton.icon(
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: primaryGreen,
-                  side: BorderSide(color: primaryGreen),
+                  foregroundColor: primaryBlue,
+                  side: BorderSide(color: primaryBlue),
                 ),
                 onPressed: pickImage,
                 icon: const Icon(Icons.image),
@@ -149,12 +149,12 @@ class _RegisterUnknownPersonState extends State<RegisterUnknownPerson> {
               const SizedBox(height: 24),
 
               loading
-                  ? CircularProgressIndicator(color: primaryGreen)
+                  ? CircularProgressIndicator(color: primaryBlue)
                   : SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: primaryGreen,
+                    backgroundColor: primaryBlue,
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
@@ -185,16 +185,16 @@ class _RegisterUnknownPersonState extends State<RegisterUnknownPerson> {
         validator: (v) => v!.isEmpty ? "Required" : null,
         decoration: InputDecoration(
           labelText: label,
-          prefixIcon: Icon(icon, color: primaryGreen),
+          prefixIcon: Icon(icon, color: primaryBlue),
           filled: true,
           fillColor: Colors.white,
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: primaryGreen),
+            borderSide: BorderSide(color: primaryBlue),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: primaryGreen, width: 2),
+            borderSide: BorderSide(color: primaryBlue, width: 2),
           ),
         ),
       ),
